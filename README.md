@@ -166,11 +166,11 @@ label => []byte label
 1 - Será necessário ciphertext adquirido em 2.2, a string com a label usada na criptografia, a chave privada adquirida em 2.1, e uma string com o nome do arquivo de saída. 
 
 2 - Primeiro se busca o []byte referente a label e a função rsa.DecryptOAEP para descriptografar. A função pede:
-hash => sha256.New()
-random io.Reader => rand.Reader
-chave privada => privKey adquirida em 1.1
-[]byte da cifra => ciphertext adquirido em 2.2
-[]byte da label
+-hash => sha256.New()
+-random io.Reader => rand.Reader
+-chave privada => privKey adquirida em 1.1
+-[]byte da cifra => ciphertext adquirido em 2.2
+-[]byte da label
 ```
     label := []byte(labelname)
 	plaintext, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, privKey, ciphertext, label)
@@ -195,3 +195,36 @@ chave privada => privKey adquirida em 1.1
 	}
 ```
 **OBS**:Arquivos em tests possuem exemplos completos realizando o passo a passo de criação de chave e criptografia e descriptografia.
+
+# 3. Exemplo de como assinar e verificar assinatura de documento
+
+### 3.1 - Assinar documento
+
+1 - Primeiro será necessária a leitura do arquivo .pem da chave privada, usando a função parseKey("nomedoarquivo") presente em **pkg/service/signDocument.go** que utiliza o mesmo processo visto em 2.1, além de ler o documento que será assinado com ioutil.ReadFile()
+
+2 - Cria-se uma mensagem de hash usando o []byte do documento, para usar posteriormente na assinatura
+
+```
+	msgHash := sha256.New()
+	_, err = msgHash.Write(fileData)
+	if err != nil {
+		return nil, fmt.Errorf("error on creating hash: %s", err.Error())
+	}
+	msgHashSum := msgHash.Sum(nil)
+```
+
+3 - Em seguida é possível criar a assinatura usando a função rsa.SignPSS(rand.Reader, chave privada, crypto.SHA256, msgHashSum adquirida acima, nil)
+
+Exemplo completo na função SignDoc() em **pkg/service/signDocument.go**, que retorna uma assinatura
+
+### 3.2 - Checar assinatura de documento
+
+1 - Também são necessários os arquivos da chave privada, o documento assinado e a assinatura adquirida em 3.1
+
+2 - Realiza-se a leitura do arquivo da chave e do documento, e cria-se o hash, assim como em 3.1
+
+3 - Para verificar a assinatura usa-se a função rsa.VerifyPSS(Chave pública adquirida com a chave privada (&privKey.PublicKey), crypto.SHA256, msgHashSum adquirida assim como em 3.1, signature adquirida com a função SignDoc, nil)
+
+Exemplo completo na função CheckSignedDoc() em **pkg/service/signDocument.go**, que retorna um erro caso a assinatura seja incompatível.
+
+OBS: Testes para as duas funções em **tests/signdoc_test.go**
